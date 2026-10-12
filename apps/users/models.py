@@ -47,14 +47,14 @@ class CustomUserManager(BaseUserManager):
                 message=_("Email field is required"),
                 code="email_empty"
             )
-        if not first_name and last_name:
+        if not first_name or not last_name:
             raise ValidationError(
                 message=_("Full name is required"),
                 code="full_name_empty"
             )
         
         new_user:'CustomUser' = self.model(
-            email = self.normalize_email(email),
+            email = self.normalize_email(email.strip()),
             first_name = first_name,
             last_name = last_name,
             password = password,
@@ -117,18 +117,6 @@ class CustomUser(AbstractBaseUser,PermissionsMixin):
     PREFERRED_LANGUAGES = [
         "en","ru","kz"
     ]
-    
-    class Role(TextChoices):
-        PET_OWNER = "pet_owner", "Pet Owner"
-        CLINIC_STAFF = "clinic_staff", "Clinic Staff"
-        CLINIC_TRANSPORT = "clinic_transport", "Clinic Transport"
-        CLINIC_ADMIN = "clinic_admin", "Clinic Admin"
-
-    role = CharField(
-        max_length=30,
-        choices=Role.choices,
-        default=Role.PET_OWNER,
-    )
 
     email = EmailField(
         unique=True,
@@ -145,10 +133,6 @@ class CustomUser(AbstractBaseUser,PermissionsMixin):
         max_length=150,
         verbose_name=_("User_last_name")
     )
-    password = CharField(
-        max_length=200,
-        verbose_name=_("Password")
-    )
     is_active = BooleanField(
         default=True,
         verbose_name=_("Statuc activate")
@@ -157,7 +141,7 @@ class CustomUser(AbstractBaseUser,PermissionsMixin):
         default=False,
         verbose_name="Staff status"
     )
-    data_joined = DateTimeField(
+    date_joined = DateTimeField(
         auto_now_add=True
     )
     avatar = ImageField(
