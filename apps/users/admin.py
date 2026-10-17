@@ -1,80 +1,72 @@
+from django import forms
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.contrib.auth.forms import ReadOnlyPasswordHashField
+from django.core.exceptions import ValidationError
 from .models import CustomUser, Invitation
-from django.utils.translation import gettext_lazy as _
+
+
+class CustomUserCreationForm(forms.ModelForm):
+    password1 = forms.CharField(widget=forms.PasswordInput)
+    password2 = forms.CharField(widget=forms.PasswordInput)
+
+    class Meta:
+        model = CustomUser
+        fields = ("email", "first_name", "last_name")
+
+    def clean_password2(self):
+        p1, p2 = self.cleaned_data.get("password1"), self.cleaned_data.get("password2")
+        if p1 != p2:
+            raise ValidationError("Passwords do not match.")
+        return p2
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        user.set_password(self.cleaned_data["password1"])
+        if commit:
+            user.save()
+        return user
+
+
+class CustomUserChangeForm(forms.ModelForm):
+    password = ReadOnlyPasswordHashField()
+
+    class Meta:
+        model = CustomUser
+        fields = "__all__"
+
+    def clean_password(self):
+        return self.initial.get("password")
+
 
 @admin.register(CustomUser)
 class CustomUserAdmin(BaseUserAdmin):
-    """
-    CustomUser моделі үшін админ панель баптаулары
-    """
-    list_display = (
-        "email",
-        "first_name",
-        "last_name",
-        "is_active",
-        "is_staff",
-        "date_joined",
-    )
-    list_filter = ( "is_active", "is_staff", "preferred_language")
+    add_form = CustomUserCreationForm
+    form = CustomUserChangeForm
+    model = CustomUser
+    list_display = ("email", "first_name", "last_name", "is_active", "is_staff")
+    list_filter = ("is_active", "is_staff", "is_superuser")
     search_fields = ("email", "first_name", "last_name")
     ordering = ("email",)
-    
-    # Django-ның AbstractBaseUser қолданатындықтан полелерді қайта анықтаймыз
     fieldsets = (
         (None, {"fields": ("email", "password")}),
-        (_("Жеке ақпарат"), {"fields": ("first_name", "last_name", "avatar")}),
-        (_("Рөлдер мен рұқсаттар"), {
-            "fields": ("role", "is_active", "is_staff", "is_superuser", "groups", "user_permissions")
-        }),
-        (_("Қосымша параметрлер"), {"fields": ("preferred_language", "timezone")}),
-        (_("Маңызды уақыттар"), {"fields": ("date_joined", "last_login")}),
+        ("Personal", {"fields": ("first_name", "last_name", "avatar", "preferred_language", "timezone")}),
+        ("Access", {"fields": ("is_active", "is_staff", "is_superuser", "groups", "user_permissions")}),
+        ("Dates", {"fields": ("last_login", "date_joined")}),
     )
-    
     add_fieldsets = (
-        (
-            None,
-            {
-                "classes": ("wide",),
-                "fields": (
-                    "email",
-                    "first_name",
-                    "last_name",
-                    "role",
-                    "password1",
-                    "password2",
-                    "is_active",
-                    "is_staff",
-                ),
-            },
-        ),
+        (None, {"classes": ("wide",), "fields": ("email", "first_name", "last_name", "password1", "password2")}),
     )
-    
-    readonly_fields = ("date_joined", "last_login")
+    readonly_fields = ("last_login", "date_joined")
 
 
 @admin.register(Invitation)
 class InvitationAdmin(admin.ModelAdmin):
-    """
-    Клиника қызметкерлерін шақыру (Invitation) моделі үшін баптаулар
-    """
-    list_display = (
-        "email",
-        "clinic",
-        "role",
-        "invited_by",
-        "is_expired_status",
-        "is_accepted_status",
-        "created_at",
-    )
-    list_filter = ("role", "clinic", "created_at")
+    list_display = ("email", "clinic", "role", "invited_by", "expires_at", "accepted_at")
+    list_filter = ("clinic", "role")
     search_fields = ("email", "clinic__name")
-    readonly_fields = ("id", "token_hash", "created_at", "invited_by")
-    
-    @admin.display(description=_("Expired?"), boolean=True)
-    def is_expired_status(self, obj):
-        return obj.is_expired
+    readonly_fields = ("token_hash", "invited_by", "accepted_at", "created_at")
 
-    @admin.display(description=_("Accepted?"), boolean=True)
-    def is_accepted_status(self, obj):
-        return obj.is_accepted
+    def has_add_permission(self, request):
+        # Invitations must be created via the token-generating API.
+        return False
