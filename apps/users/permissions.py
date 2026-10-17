@@ -1,7 +1,7 @@
 
 from rest_framework.permissions import BasePermission
 
-from clinics.models import ClinicMembership
+from apps.clinics.models import ClinicMembership
 
 
 def get_clinic_membership(request, view):
