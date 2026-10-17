@@ -1,6 +1,7 @@
 from django.db.models import Q
+from django.db.models.deletion import ProtectedError
 from rest_framework import viewsets, permissions
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from apps.clinics.access import managed_clinic_ids
 from .models import Pet
 from .serializers import PetSerializer
@@ -22,4 +23,7 @@ class PetViewSet(viewsets.ModelViewSet):
     def perform_destroy(self, instance):
         if instance.owner_id != self.request.user.pk:
             raise PermissionDenied("Only the pet owner can delete a pet.")
-        instance.delete()
+        try:
+            instance.delete()
+        except ProtectedError:
+            raise ValidationError("This pet has appointments and cannot be deleted.")

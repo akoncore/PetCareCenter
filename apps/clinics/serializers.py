@@ -2,6 +2,14 @@ from rest_framework import serializers
 from .models import Clinic, ClinicMembership
 
 class ClinicSerializer(serializers.ModelSerializer):
+    def validate(self, attrs):
+        if "is_active" in attrs and not self.context["request"].user.is_superuser:
+            if self.instance and attrs["is_active"] != self.instance.is_active:
+                raise serializers.ValidationError(
+                    {"is_active": "Only a system administrator can change clinic activation."}
+                )
+        return attrs
+
     class Meta:
         model = Clinic
         fields = ["id", "name", "email", "phone", "address", "city", "country",

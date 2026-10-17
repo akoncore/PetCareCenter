@@ -53,7 +53,8 @@ class ClinicViewSet(viewsets.ModelViewSet):
             "active_services": Service.objects.filter(clinic=clinic, is_active=True).count(),
             "upcoming_appointments": upcoming.count(),
             "pending_transport": TransportRequest.objects.filter(
-                appointment__clinic=clinic, status=TransportRequest.Status.REQUESTED,
+                appointment__clinic=clinic, appointment__status=Appointment.Status.BOOKED,
+                status=TransportRequest.Status.REQUESTED,
             ).count(),
             "next_appointments": [
                 {"id": a.pk, "pet": str(a.pet_id), "starts_at": a.starts_at.isoformat()}

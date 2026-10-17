@@ -113,6 +113,9 @@ class AppointmentViewSet(viewsets.ModelViewSet):
                 TransportRequest.Status.REQUESTED, TransportRequest.Status.REJECTED,
             ]:
                 raise ValidationError("Confirmed transport must be cancelled by coordination.")
+            if hasattr(item, "transport") and item.transport.status == TransportRequest.Status.REQUESTED:
+                item.transport.status = TransportRequest.Status.REJECTED
+                item.transport.save(update_fields=["status", "updated_at"])
             item.status = Appointment.Status.CANCELLED
             item.save(update_fields=["status"])
         return Response(self.get_serializer(item).data)
