@@ -39,6 +39,14 @@ class Pet(models.Model):
         help_text="Dog, cat, bird, etc.",
     )
 
+    class Size(models.TextChoices):
+        UNKNOWN = "unknown", "Unknown"
+        SMALL = "small", "Small"
+        MEDIUM = "medium", "Medium"
+        LARGE = "large", "Large"
+
+    size = models.CharField(max_length=10, choices=Size.choices, default=Size.UNKNOWN)
+
     breed = models.CharField(
         max_length=100,
         blank=True,

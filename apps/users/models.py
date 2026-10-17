@@ -164,6 +164,9 @@ class CustomUser(AbstractBaseUser,PermissionsMixin):
     USERNAME_FIELD = "email"
     objects = CustomUserManager()
 
+    def __str__(self):
+        return self.email
+
     class Meta:
         """
         Meta options for CustomUser model
