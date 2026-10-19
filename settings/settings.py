@@ -32,6 +32,7 @@ ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1,test
 # Application definition
 
 INSTALLED_APPS = [
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -49,6 +50,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'apps.core.middleware.RequestLoggingMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -76,6 +78,52 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'settings.wsgi.application'
+ASGI_APPLICATION = 'settings.asgi.application'
+
+# Redis databases are separate so cache operations cannot remove channel messages.
+REDIS_URL = os.environ.get("REDIS_URL", "redis://127.0.0.1:6379/0")
+CHANNEL_REDIS_URL = os.environ.get("CHANNEL_REDIS_URL", "redis://127.0.0.1:6379/1")
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": REDIS_URL,
+        "KEY_PREFIX": "petcare",
+        "OPTIONS": {"socket_connect_timeout": 1, "socket_timeout": 1},
+    },
+}
+CLINIC_CACHE_TTL = int(os.environ.get("CLINIC_CACHE_TTL", "60"))
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [{"address": CHANNEL_REDIS_URL,
+                       # channels_redis blocks for 5s while waiting for messages.
+                       "socket_connect_timeout": 1, "socket_timeout": 10}],
+            "prefix": "petcare:channels",
+            "expiry": 60,
+            "group_expiry": 86400,
+        },
+    },
+}
+# Exact browser origins, separate from HTTP ALLOWED_HOSTS. Use https:// in production.
+WEBSOCKET_ALLOWED_ORIGINS = os.environ.get(
+    "WEBSOCKET_ALLOWED_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000"
+).split(",")
+WEBSOCKET_AUTH_TIMEOUT = 5
+DAPHNE_WEBSOCKET_MAX_MESSAGE_SIZE = 2048
+DAPHNE_WEBSOCKET_MAX_FRAME_SIZE = 2048
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {"json": {"()": "apps.core.logging.JsonFormatter"}},
+    "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "json"}},
+    "root": {"handlers": ["console"], "level": os.environ.get("LOG_LEVEL", "INFO")},
+    "loggers": {
+        "django": {"handlers": ["console"], "level": "WARNING", "propagate": False},
+        "petcare": {"handlers": ["console"], "level": os.environ.get("LOG_LEVEL", "INFO"), "propagate": False},
+    },
+}
 
 AUTH_USER_MODEL = "users.CustomUser" 
 

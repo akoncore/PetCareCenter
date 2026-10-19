@@ -9,6 +9,7 @@ from apps.clinics.models import ClinicMembership
 from apps.clinics.access import CLINIC_MANAGERS, has_clinic_role, managed_clinic_ids
 from apps.clinics.models import Clinic
 from .models import Service, Appointment, TransportRequest
+from .access import visible_appointments, visible_transport
 from .serializers import (
     ServiceSerializer, AppointmentSerializer, RescheduleSerializer,
     TransportSerializer, ensure_slot_available,
@@ -58,14 +59,13 @@ class AppointmentViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        qs = Appointment.objects.select_related("clinic", "pet", "service", "owner")
+        qs = visible_appointments(user)
         if user.is_superuser:
             return qs
-        result = qs.filter(Q(owner=user) | Q(clinic_id__in=managed_clinic_ids(user))).distinct()
         requested_status = self.request.query_params.get("status")
         if requested_status in Appointment.Status.values:
-            return result.filter(status=requested_status)
-        return result
+            return qs.filter(status=requested_status)
+        return qs
 
     @action(detail=True, methods=["post"])
     def reschedule(self, request, pk=None):
@@ -138,21 +138,7 @@ class TransportViewSet(viewsets.ModelViewSet):
     http_method_names = ["get", "post", "head", "options"]
 
     def get_queryset(self):
-        user = self.request.user
-        qs = TransportRequest.objects.select_related("appointment", "assigned_driver")
-        if user.is_superuser:
-            return qs
-        return qs.filter(
-            Q(appointment__owner=user)
-            | Q(appointment__clinic_id__in=managed_clinic_ids(user))
-            | Q(
-                assigned_driver=user,
-                appointment__clinic__memberships__user=user,
-                appointment__clinic__memberships__role=ClinicMembership.Role.TRANSPORT,
-                appointment__clinic__memberships__is_active=True,
-                appointment__clinic__is_active=True,
-            )
-        ).distinct()
+        return visible_transport(self.request.user)
 
     @action(detail=True, methods=["post"])
     def advance(self, request, pk=None):
