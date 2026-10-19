@@ -8,10 +8,23 @@ from apps.booking.models import Appointment, TransportRequest, Service
 from .models import Clinic, ClinicMembership
 from .serializers import ClinicSerializer, ClinicMembershipSerializer
 from .access import has_clinic_role, managed_clinic_ids, CLINIC_MANAGERS
+from .cache import public_catalogue_key, read_catalogue, store_catalogue
 
 class ClinicViewSet(viewsets.ModelViewSet):
     serializer_class = ClinicSerializer
     http_method_names = ["get", "post", "patch", "head", "options"]
+
+    def list(self, request, *args, **kwargs):
+        # Never share role-dependent responses or future filtered query variants.
+        if request.user.is_authenticated or request.query_params:
+            return super().list(request, *args, **kwargs)
+        key = public_catalogue_key()
+        data = read_catalogue(key)
+        if data is not None:
+            return Response(data)
+        response = super().list(request, *args, **kwargs)
+        store_catalogue(key, response.data)
+        return response
 
     def get_permissions(self):
         if self.action in ("list", "retrieve"):
